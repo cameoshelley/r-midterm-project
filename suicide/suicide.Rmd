@@ -1,0 +1,170 @@
+---
+title: "Is suicide rate higher in poorer countries? Does it have anything to do with the number of mental health facilities?"
+output: pdf_document
+---
+```{r, include = FALSE}
+#setup
+library(tidyverse)
+library(ggplot2)
+library(tmap)
+library(countrycode)
+data("World")
+
+#read data
+s<-read.table(file = "suiciderate.csv", sep = ",")
+gdp<-read.table(file = "gdppercap.csv", sep = ",")
+workers<- read_csv("MH_6,MH_7,MH_8,MH_9.csv")
+policy<- read_csv("MH_25,MH_26,MH_27,MH_3,MH_5.csv")
+beds<- read_csv("MH_13,MH_15,MH_16.csv")
+healthcare <- read_csv("MH_10,MH_11,MH_14,MH_17,MH_18.csv")
+
+#tidy data
+s1<- s[-c(1,2),]
+s2<-filter(select(s1, V1, V2, V3), V2==" Both sexes")
+s3<-transform(select(s2, V1, V3), V3=as.numeric(V3))
+s2016<-arrange(s3, desc(V3))
+s4<-rename(s2016, sovereignt=V1, suicide_rate_per_100000_population=V3)
+s5<-cbind(
+  iso_a3=apply(s4[1],1,countrycode, origin = 'country.name', destination = 'iso3c'),
+  s4[2]
+)
+
+p2_1<-inner_join(World, s5, by="iso_a3")
+
+gdp2016<-cbind(
+  V1=apply(gdp[1],1,countrycode, origin = 'country.name', destination = 'iso3c'),
+  gdp[61]
+)
+
+s6<-cbind(
+  V1=apply(s3[1],1,countrycode, origin = 'country.name', destination = 'iso3c'),
+  s3[2]
+)
+
+s_gdp<-inner_join(s6, gdp2016, by="V1")
+s_gdp2016<-s_gdp %>% 
+  rename(
+    country=V1,
+    suicide_rate_per_100000_population=V3,
+    gdp_per_capita=V61
+  )
+
+gdp2016_1<-rename(gdp2016,
+  iso_a3=V1,
+  gdp_per_capita=V61
+)
+
+
+mental_health<-inner_join(healthcare, workers, by="Country")
+
+mh<-transmute(mental_health, Country=Country, 
+                         mental_health_units = mental_health[[3]]+mental_health[[4]],
+                         number_of_psychiatrists = mental_health[[9]],
+              )
+mh1<-cbind(
+    iso_a3=apply(mh[1],1,countrycode, origin = 'country.name', destination = 'iso3c'),
+    mh[2],
+    mh[3]
+)
+
+mh2<-inner_join(mh1, s5, by="iso_a3")
+
+mh3<-inner_join(mh1, gdp2016_1, by="iso_a3")
+
+```
+Many people, including me in primary school, think that poor people are more likely to feel sad and commit suicide. However, in a famous study, resesarchers found that happiness is relative (1). For example, the blind, the retarded, and the malformed are not significantly less happy than others. This means that maybe poor people aren's significantly less happy as well. According to many articles, the raltionship between suicide rate and economic status in a country is complicated. Some studies show that extremely high and extremely low income are both associated with high suicide rate (2). Another study shows that suicide rate is associated with low income in Denmark (3). In this project, I'll try to answer the question is suicide rate higher in poorer countries and why.  
+
+Part 1: Is suicide rate higher in poorer countries?
+
+First, here's the suicide rate by countries in 2016:
+
+```{r, echo=FALSE, warning = FALSE, message = FALSE}
+tm_shape(p2_1) +
+  tm_polygons("suicide_rate_per_100000_population")
+```
+
+From this graph, we can see that the suicide rate is high in those countries that used to be a part of the Soviet Union. Also, it's high in South American European colonies, but relatively low in other parts of South America and Africa.
+
+The graph below shows the relationship between the gdp per capita and the suicide rate of different countries in 2016. 
+
+```{r, echo=FALSE, warning = FALSE, message = FALSE, out.height='50%', out.width='50%'}
+p1<-ggplot(data = s_gdp2016) + 
+    geom_point(mapping = aes(x = suicide_rate_per_100000_population, y = gdp_per_capita))
+p1+scale_x_continuous(
+  breaks = c(5, 10, 15, 20, 25, 30),
+  label = c("5", "10", "15", "20","25","30")
+  )
+```
+
+From this graph, we can see that in countries with average gdp per capita higher than 30000 dollars, their suicide rate is mostly distributed in the middle. In countries with average gdp per capita lower than 30000 dollars but higher than 12500 dollars, their suicide rate distribute from around 0 to higher than 30, and a large proportion of them are lower than 15. For countries with average gdp per capita lower than 12500 dollars, all of them has a suicide rate lower than 15 except 11 countries. 
+
+Overall, according to the graph, there isn't a strong correlation between the suicide rate and gdp per capita in different countries. 
+
+Part 2: How does suicide rate relate with the number of mental health facilities?
+
+The graphs below shows the relationship between the suicide rate per 100000 population, the number of mental health units per 100000 population and the number of psychiatrists per 100000 population in 2016. The number of mental helath units equals the number of mental hospitals plus the number of mental health units in general hospitals.
+
+```{r, echo=FALSE, warning = FALSE, message = FALSE, out.height='50%', out.width='50%'}
+p2<-ggplot(data = mh2) + 
+  geom_point(mapping = aes(x = suicide_rate_per_100000_population, y = mental_health_units))
+p2+scale_x_continuous(
+  breaks = c(5, 10, 15, 20, 25, 30),
+  label = c("5", "10", "15", "20","25","30")
+)
+
+p3<-ggplot(data = mh2) + 
+  geom_point(mapping = aes(x = suicide_rate_per_100000_population, y = number_of_psychiatrists))
+p3+scale_x_continuous(
+  breaks = c(5, 10, 15, 20, 25, 30),
+  label = c("5", "10", "15", "20","25","30")
+)
+```
+
+From this 2 graphs, we can see that number of psychiatrists is positively correlated with suicide rate. Also, we can see that the number of mental health units are not strongly correlated with the suicide rate. In addition, there's an outlier with extremely large number of mental health units in this graph. The outlier is Japan. Japan has 8.764 mental health units and 11.867 psychiatrists per 100000 population in 2016.
+
+This sounds counterintuitive at the beginning, because psychiatrists treat mental disorders, which means they prevent people from committing suicide. However, maybe the logic is reverse. It might be that the number of psychiatrists in a country is large because lots of psychiatrists are needed due to high suicide rate. Also, in Part 1, we found that gdp per capita is not stronly related to the suicide rate in different countries, and it's natural to guess that wealthier countries have better mental health facilities. Thus, it's reasonable that the suicide rate isn't strongly related to the mental health conditions in different countries. 
+
+To test whether our guess is right, we draw these 2 graphs below:
+
+```{r, echo=FALSE, warning = FALSE, message = FALSE, out.height='50%', out.width='50%'}
+p4<-ggplot(data = mh3) + 
+  geom_point(mapping = aes(x = gdp_per_capita, y = number_of_psychiatrists))
+p4+scale_x_continuous(
+  breaks = c(5, 10, 15, 20, 25, 30),
+  label = c("5", "10", "15", "20","25","30")
+)
+
+p5<-ggplot(data = mh3) + 
+  geom_point(mapping = aes(x = gdp_per_capita, y = mental_health_units))
+p5+scale_x_continuous(
+  breaks = c(5, 10, 15, 20, 25, 30),
+  label = c("5", "10", "15", "20","25","30")
+)
+```
+
+As shown on the graph, gdp per capita is correlated with both the number of psychiatrists per 100000 population and the number of mental health units per 100000 population, especially for the number of psychiatrists. Our guess is right.
+
+Also, some countries don't have available data. Most of these countries probably has a low gdp per capita and thus few mental health facilities, or maybe there aren't many people living in those countries. Else, the only other possibily of no data available is political matters, such as in North Korea. The suicide rate in those countries is probably similar to most countries with a low gdp per capita, although I'm not sure, and nobody is sure until we collect data in those countries. However, if my guess is right, the lack of data from those countries won't affect this study too much, since there's already lots of plots cluttering at the lower left corner of every dotplot, and adding more dots in that cluster won't affect the correlation between the x-axis and y-axis in the graphs too much. 
+
+
+
+References:
+
+1. https://pubmed.ncbi.nlm.nih.gov/690806/
+
+2. https://www.gulfbend.org/poc/view_doc.php?type=doc&id=13737&cn=9
+
+3. https://ajp.psychiatryonline.org/doi/pdf/10.1176/appi.ajp.160.4.765
+
+
+Packages used:
+
+countrycode, ggplot2, tidyverse, tmap.
+
+Data source:
+
+gdp per capita data:
+https://data.worldbank.org/indicator/NY.GDP.PCAP.CD
+
+suicide rate and mental health facilites data:
+https://apps.who.int/gho/data/node.main.MENTALHEALTH?lang=en
