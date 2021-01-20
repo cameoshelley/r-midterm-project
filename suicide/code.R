@@ -68,6 +68,10 @@ mh2<-inner_join(mh1, s5, by="iso_a3")
 
 mh3<-inner_join(mh1, gdp2016_1, by="iso_a3")
 
+mh4<-left_join(World, mh3, by="iso_a3")
+
+mh5<-mutate(mh4, missing_data=is.na(mental_health_units))
+
 #graphs
 p1<-ggplot(data = s_gdp2016) + 
     geom_point(mapping = aes(x = suicide_rate_per_100000_population, y = gdp_per_capita))
@@ -107,7 +111,8 @@ p5+scale_x_continuous(
 tm_shape(p2_1) +
   tm_polygons("suicide_rate_per_100000_population")
 
-
+tm_shape(mh5) +
+  tm_polygons("missing_data")
 
 
 
